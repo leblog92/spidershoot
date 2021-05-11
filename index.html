@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Spider Shooter</title>
+	<link rel="icon" type="image/png" href="favicon.png" />
+	<style>
+		html,body{
+			height:100%;
+			margin:0;
+		}
+		body{
+			font-family:Consolas;
+			background:linear-gradient(90deg,#100,#000,#100);
+			text-align:center
+		}
+		.center{
+			dominant-baseline:middle;
+			text-anchor:middle;
+		}
+		#svg1{
+			width:800px;
+			height:800px;
+			margin-top:0;
+			cursor:none;
+		}
+		#path1,#player1{
+			transition:linear 50ms;
+		}
+		#div1{
+			position:fixed;
+			text-align:center;
+			top:8px;
+			width:100%;
+			color:#666;
+			user-select:none;
+			z-index:-99;
+		}
+		#div2{
+			position:fixed;
+			text-align:center;
+			bottom:8px;
+			width:100%;
+			color:#666;
+			user-select:none;
+			z-index:-99;
+		}
+		#title{
+			transition:3s;
+		}
+		#dead_panel{
+			transition:3s;
+		}
+		g[id^="idm_"]{
+		transition:300ms;
+		/*transition:400ms;*/
+		}
+		g[id^="img_"]{
+		/*transition:linear 500ms;*/
+		transition:linear 400ms;
+		}
+	</style>
+</head>
+
+<body>
+	<audio id="tune" loop>
+		<source src="theme.mp3" type="audio/mpeg">
+	</audio>
+	<div id="div1"></div>
+	<div id="div2"></div>
+	<svg id="svg1" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+	<defs>
+		<filter height="200%" width="200%" y="-50%" x="-50%" id="blur">
+			<feGaussianBlur stdDeviation="0.5" in="SourceGraphic"/>
+		</filter>
+		<filter height="200%" width="200%" y="-50%" x="-50%" id="bigblur">
+			<feGaussianBlur stdDeviation="4" in="SourceGraphic"/>
+		</filter>
+		<mask id="hide">
+		<rect width="100" height="100" fill="white"/>
+		<circle cx="50" cy="50" r="16" fill="black" filter="url(#bigblur)"/>
+		<circle cx="50" cy="50" r="8" fill="black" filter="url(#bigblur)" id="light"/>
+		</mask>
+	</defs>
+		<!-- <rect width="100" height="100" stroke="#000" opacity="0.8" stroke-width="0.1" fill="#555"/> -->
+		<image width="100" height="100" xlink:href="back.png"/>
+		<rect width="100" height="100" style="mask:url(#hide)"/>
+		<!-- <path d="m5 50L100 50" stroke="#000" stroke-width="100" stroke-dasharray="0.05 4.95" fill="none" opacity="0.5"/> -->
+		<!-- <path d="m50 5L50 100" stroke="#000" stroke-width="100" stroke-dasharray="0.05 4.95" fill="none" opacity="0.5"/> -->
+		<g id="monster_area"></g>
+		<g transform="translate(50 50)" id="player1" style="pointer-events: none;">
+			<circle cx="0" cy="0" r="0.25" fill="#f00"/>
+			<circle cx="0" cy="0" r="2" fill="#f00" opacity="0.125" filter="url(#blur)"/>
+		</g>
+		<path d="m50 50L50 50" stroke="#f00" stroke-width="0.1" fill="none" opacity="0.4" id="path1" style="pointer-events: none;"/>
+		<g transform="translate(50 50)" id="gmove" style="pointer-events: none;">
+			<g transform="rotate(0 0 0)" id="g1">
+				<image xlink:href="sprite1.png" x="-7.4" y="-3.7" width="8" height="5" id="sprite"/>
+			</g>
+		</g>
+		<g id="title" transform="translate(0 0)">
+			<image xlink:href="door.png" x="0" y="0" width="100" height="100"/>
+			<image xlink:href="title.png" x="0" y="0" width="100" height="100"/>
+			<text class="center" x="50" y="65" fill="white" font-size="10">START</text>
+		</g>
+		<g id="dead_panel" transform="translate(0 -100)">
+			<image xlink:href="death.png" x="0" y="0" width="100" height="100"/>
+			<text class="center" x="50" y="80" fill="white" font-size="5">BETTER LUCK NEXT TIME</text>
+		</g>
+	</svg>
+
+	<script>
+	/*jshint esversion: 6 */
+	var svg1=document.getElementById("svg1");
+	var tune = document.getElementById("tune");
+	var gmove=document.getElementById("gmove");
+	var g1=document.getElementById("g1");
+	var sprite=document.getElementById("sprite");
+	var path1=document.getElementById("path1");
+	var light=document.getElementById("light");	
+	var player1=document.getElementById("player1");
+	var div1=document.getElementById("div1");
+	var div2=document.getElementById("div2");
+	var title=document.getElementById("title");
+	var dead_panel=document.getElementById("dead_panel");
+	var monster_area=document.getElementById("monster_area");
+	var playerX=50;
+	var playerY=50;
+	var mx=50;
+	var my=50;
+	var ww=window.innerWidth;
+	var wh=window.innerHeight;
+	var p1,p2,angleDeg,bound,bound_left,bound_top,bullet,monster,dist,move_all;
+	var nok=0;
+	var max=1;
+
+	svg1.style.marginTop=Math.round((wh-800)/2)+"px";
+	bound=svg1.getBoundingClientRect();
+	bound_left=Math.round(bound.left);
+	bound_top=Math.round(bound.top);
+	svg1.setAttribute("width",wh+"px");
+	svg1.setAttribute("height",wh+"px");
+	div1.setAttribute("width",bound.left+" px");
+
+	function showCoords(event){
+	mx=Math.round((event.clientX-bound_left)/8);
+	my=Math.round((event.clientY-bound_top)/8);
+	player1.setAttribute("transform", "translate("+mx+" "+my+")");
+	light.setAttribute("cx",mx);
+	light.setAttribute("cy",my);
+	p1={x:playerX,y:playerY};
+	p2={x:mx,y:my};
+	angleDeg=Math.round(Math.atan2(p2.y-p1.y,p2.x-p1.x)*180/Math.PI);
+	g1.setAttribute("transform","rotate("+angleDeg+" 0 0)");
+	path1.setAttribute("d","m"+playerX+" "+playerY+"L"+mx+" "+my);
+	dist=Math.round(Math.getDistance(playerX,playerY,mx,my));
+	/*div1.innerHTML="<h1>Spider Shoot</h1>window width: "+ww+"px height: "+wh+"px<br>player x: "+playerX+" y: "+playerY+"<br>mouse x: "+mx+" y: "+my+"<br>angle: "+angleDeg+"°<br>bounding left: "+bound_left+"px top: "+bound_top+"px<br>distance: "+dist+"px<br>shoot timeout: "+(10*dist+300)+"ms<br>number of kills: "+nok;*/
+	}
+	svg1.addEventListener("mousemove", event => {showCoords(event);});
+
+	Math.getDistance=function(x1,y1,x2,y2){
+		var xs=x2-x1,ys=y2-y1;		
+		xs*=xs;
+		ys*=ys;
+		return Math.sqrt(xs+ys);
+	};
+
+	function createBullet(){
+	bullet=document.createElementNS("http://www.w3.org/2000/svg","circle");
+	bullet.setAttribute("cx",playerX);
+	bullet.setAttribute("cy",playerY);
+	bullet.setAttribute("r","0.3");
+	bullet.setAttribute("fill","black");
+	bullet.setAttribute("style","transition:linear "+5*dist+"ms;");
+	svg1.appendChild(bullet);
+	new Audio("shoot.mp3").play();
+	}
+
+	function fire(){
+	svg1.removeEventListener("mouseup",fire);
+	createBullet();
+	setTimeout(function(){
+					bullet.setAttribute("cx",mx);
+					bullet.setAttribute("cy",my);
+					setTimeout(function(){
+					svg1.removeChild(bullet);
+					svg1.addEventListener("mouseup",fire);
+				},((5*dist)+50));
+			},50);
+	}
+	svg1.addEventListener("mouseup",fire);
+
+	function create_monsters(){
+		new Audio("appear.mp3").play();
+		for(var i=0;i<max;i++){
+			x=Math.round(((Math.random()*92)));
+			y=Math.round(((Math.random()*92)));
+				while(Math.getDistance(playerX-4,playerY-4,x,y)<25){
+					x=Math.round(((Math.random()*92)));y=Math.round(((Math.random()*92)));
+				}
+			g2=document.createElementNS(svg1.namespaceURI,"g");
+			if(x<10){x="0"+x};if(y<10){y="0"+y};
+			g2.setAttribute("transform","translate("+x+" "+y+")");
+			g2.setAttribute("class","spider");
+			g2.setAttribute("id","idm_"+i);
+			monster=document.createElementNS(svg1.namespaceURI,"image");
+			var choice=Math.round(Math.random());
+				if(choice==0){
+					monster.setAttributeNS("http://www.w3.org/1999/xlink","href","bmonster.gif");
+				}else{
+					monster.setAttributeNS("http://www.w3.org/1999/xlink","href","monsterblind.gif");
+				}
+			monster.setAttribute("x",-4);
+			monster.setAttribute("y",-4);
+			p1={x:playerX,y:playerY};
+			mp2={x:x+4,y:y+4};
+			monster.setAttribute("transform","rotate("+Math.round(Math.atan2(mp2.y-p1.y,mp2.x-p1.x)*180/Math.PI)+" 0 0)");
+			monster.setAttribute("width",8);
+			monster.setAttribute("height",8);
+			monster.setAttribute("opacity",1);
+			monster.setAttribute("id","img_"+i);
+			monster_area.appendChild(g2);
+			g2.appendChild(monster);
+		}
+		for(var i=0;i<max;i++){
+			document.getElementsByClassName('spider')[i].addEventListener('click',event=>{kill(event);});
+		}
+	}
+
+	function move_monster(){
+		for(var i=0;i<document.getElementsByClassName('spider').length;i++){
+			var data_monster=document.getElementsByClassName('spider')[i].getAttribute("transform");
+			sx=data_monster.substr(10,2);
+			sy=data_monster.substr(13,2);
+			if(sx<playerX){sx++;}
+			if(sx>playerX){sx--;}
+			if(sy<playerY){sy++;}
+			if(sy>playerY){sy--;}
+			if(sx<10){sx="0"+sx;}
+			if(sy<10){sy="0"+sy;}
+			if(sx==playerX&&sy==playerY){dead();}
+			mp2.x=sx;mp2.y=sy;
+			document.getElementsByClassName('spider')[i].childNodes[0].setAttribute("transform","rotate("+Math.round(Math.atan2(mp2.y-p1.y,mp2.x-p1.x)*180/Math.PI)+" 0 0)");
+			document.getElementsByClassName('spider')[i].setAttribute("transform","translate("+sx+" "+sy+")");
+		}
+	}
+
+	function kill(event){
+		setTimeout(function(){
+			new Audio("death.mp3").play();
+			event.target.setAttributeNS("http://www.w3.org/1999/xlink","href","monster2.png");
+			event.target.setAttribute("opacity","0.5");
+			setTimeout(function(){event.target.parentNode.remove();nok++;
+			if(nok==10){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==20){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==30){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==40){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==50){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==60){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==70){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==80){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==90){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==100){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==110){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==120){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==130){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==140){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==150){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==160){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==170){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==180){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==190){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}else if(nok==200){
+				new Audio("bonus.mp3").play();
+				div1.innerHTML+="⭐";
+			}
+			div2.innerHTML="number of kills: "+nok;
+			if(document.getElementsByClassName('spider').length==0){		
+			max++;create_monsters();}},250);
+		},((10*dist)+50))
+	}
+
+	title.addEventListener("click", open, false);
+
+	function open(){
+		new Audio("open.mp3").play();
+		title.removeEventListener("click", open, false);
+		title.setAttribute("transform","translate(0 100)");
+		tune.volume=0.8;
+		tune.play();
+		setTimeout(function(){
+			create_monsters();
+			move_all=setInterval(move_monster,300);
+		},3000);
+	}
+	
+	function dead(){
+		clearInterval(move_all);
+		move_all=0; 
+		new Audio("end.mp3").play();
+		new Audio("open.mp3").play();
+		dead_panel.setAttribute("transform","translate(0 0)");
+	}
+	</script>
+</body>
+</html>
