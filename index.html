@@ -112,7 +112,7 @@
 	<script>
 	/*jshint esversion: 6 */
 	var svg1=document.getElementById("svg1");
-	var tune = document.getElementById("tune");
+	var tune=document.getElementById("tune");
 	var gmove=document.getElementById("gmove");
 	var g1=document.getElementById("g1");
 	var sprite=document.getElementById("sprite");
@@ -334,7 +334,8 @@
 	
 	function dead(){
 		clearInterval(move_all);
-		move_all=0; 
+		move_all=0;
+		tune.pause();
 		new Audio("end.mp3").play();
 		new Audio("open.mp3").play();
 		dead_panel.setAttribute("transform","translate(0 0)");
